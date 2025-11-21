@@ -352,6 +352,15 @@ python test_backdoor.py
 python generate_backdoor_report.py
 ```
 
+**6. 生成完整攻击流程可视化**：
+```powershell
+python visualize_complete_attack.py --num-samples 5
+```
+此脚本生成包含以下三列的可视化：
+- 列1：原始训练图像
+- 列2：毒化版本（clean-label）
+- 列3：带触发器的测试图像及预测标签
+
 ### 关键参数说明
 
 #### 后门攻击参数
@@ -401,6 +410,7 @@ python generate_backdoor_report.py
 - `poison_samples.pdf`: 毒化样本对比（原始 vs 毒化 vs 扰动）
 - `backdoor_attack.pdf`: 后门触发效果展示
 - `backdoor_results.pdf`: 综合评估报告
+- `complete_attack_visualization.pdf`: **完整攻击流程可视化**（满足作业要求的三合一展示）
 
 ### 评估指标说明
 
@@ -448,21 +458,31 @@ python generate_backdoor_report.py
 
 ### 可视化输出说明
 
-#### 1. poison_samples.pdf
+#### 1. complete_attack_visualization.pdf ⭐ **（作业要求）**
+**完整的攻击流程三合一可视化**，包含至少5组样本：
+- **列1**: 原始训练图像（用于生成毒化样本的源图像）
+- **列2**: 毒化版本（保持原始标签，通过特征碰撞优化）
+- **列3**: 带触发器的测试图像 + 模型预测标签（显示后门激活效果）
+
+**智能样本选择**: 脚本会自动测试多个样本，选择展示**成功和失败的混合案例**（通常3-4个成功，1-2个失败），真实反映攻击效果和局限性。
+
+此可视化完全满足作业要求："at least five visualizations showing the original image, its poisoned version, and the triggered test sample with predicted labels"
+
+#### 2. poison_samples.pdf
 展示毒化过程：
 - 原始干净样本
 - 经过特征碰撞优化的毒化样本
 - 扰动差异（放大5倍以便观察）
 - 验证clean-label特性
 
-#### 2. backdoor_attack.pdf
+#### 3. backdoor_attack.pdf
 展示后门触发效果：
 - 原始测试图像及模型预测
 - 添加trigger后的图像
 - 模型对触发样本的预测（目标类）
 - Trigger位置和大小标注
 
-#### 3. backdoor_results.pdf
+#### 4. backdoor_results.pdf
 综合评估报告：
 - 准确率和ASR对比图表
 - 混淆矩阵分析
@@ -516,6 +536,96 @@ python demo.py
 ```
 
 **注意**：`conda init` 执行后必须**重启PowerShell窗口**才能生效，不能在同一个窗口继续使用 `conda activate`。
+
+---
+
+## 作业要求完成情况核对清单
+
+### Part 1: Adversarial Example Generation (Auto-PGD) ✅
+
+#### 要求核对：
+- ✅ **训练/微调 ResNet-18**: 使用预训练模型在CIFAR-10上微调
+- ✅ **记录训练曲线**: `artifacts/training_log.csv` 包含训练和验证准确率
+- ✅ **Auto-PGD攻击**: 使用 `torchattacks.APGD`，参数 ε=8/255, 约100步迭代
+- ✅ **评估指标**: 计算干净准确率和对抗准确率
+- ✅ **可视化**: `artifacts/report.pdf` 包含至少5组样本（原始/对抗/扰动+标签）
+- ✅ **参数分析**: `artifacts/parameter_analysis.pdf` 分析ε和步长的影响
+- ✅ **可重现**: README提供完整命令和参数说明
+
+#### 提交文件：
+- ✅ `README.md` - 完整的重现说明
+- ✅ `run_experiment.py`, `demo.py`, `analysis.py` - 可运行代码
+- ✅ `artifacts/report.pdf` - 包含训练曲线、对比表格、至少5个可视化示例和分析
+
+---
+
+### Part 2: Clean-Label Backdoor Attack ✅
+
+#### 要求核对：
+- ✅ **实现Feature Collision方法**: `src/backdoor.py` 实现完整算法
+- ✅ **CIFAR-10 + ResNet-18**: 使用CIFAR-10数据集和ResNet-18模型
+- ✅ **毒化率**: 支持0.5%-3%毒化率（默认1%）
+- ✅ **训练毒化模型**: `backdoor_experiment.py` 完整训练流程
+- ✅ **可见触发器**: 5×5白色补丁，位置可配置
+- ✅ **评估指标**: 计算干净准确率和ASR（攻击成功率）
+- ✅ **算法说明**: `backdoor_results/backdoor_report.pdf` 包含公式/伪代码
+- ✅ **关键参数文档化**: README和report中详细说明
+- ✅ **完整可视化**: `complete_attack_visualization.pdf` - **至少5组**，展示：
+  - 原始图像
+  - 毒化版本
+  - 带触发器的测试样本 + 预测标签
+- ✅ **结果总结**: 3-5句话解释攻击效果和原因
+
+#### 提交文件：
+- ✅ `README.md` / `README.txt` - 命令和参数位置说明
+- ✅ 可运行代码目录:
+  - `backdoor_experiment.py` - 毒化生成和训练
+  - `test_backdoor.py` - 评估
+  - `visualize_complete_attack.py` - 完整可视化
+  - `generate_backdoor_report.py` - 报告生成
+  - `src/backdoor.py` - 核心算法
+  - `src/backdoor_vis.py` - 可视化工具
+- ✅ `backdoor_results/backdoor_report.pdf` - 完整报告，包含：
+  - 算法公式/伪代码
+  - 超参数说明
+  - 干净准确率和ASR结果
+  - 至少5组可视化（通过 `complete_attack_visualization.pdf`）
+  - 结果总结和分析
+
+---
+
+## 快速验证作业完整性
+
+### Part 1 验证命令：
+```powershell
+# 1. 快速演示（2-3分钟）
+& D:\Software\Anaconda\envs\IOTA6910H\python.exe demo.py
+
+# 2. 查看生成的文件
+ls artifacts/
+# 应包含: report.pdf, parameter_analysis.pdf, training_log.csv, metrics.json
+```
+
+### Part 2 验证命令：
+```powershell
+# 1. 运行快速实验（约10-15分钟）
+& D:\Software\Anaconda\envs\IOTA6910H\python.exe backdoor_experiment.py --epochs 5 --poison-rate 0.01
+
+# 2. 生成完整可视化（满足作业要求）
+& D:\Software\Anaconda\envs\IOTA6910H\python.exe visualize_complete_attack.py --num-samples 5
+
+# 3. 生成综合报告
+& D:\Software\Anaconda\envs\IOTA6910H\python.exe generate_backdoor_report.py
+
+# 4. 查看生成的文件
+ls backdoor_results/
+# 应包含: 
+#   - backdoor_model.pt (模型)
+#   - complete_attack_visualization.pdf (⭐ 关键：三合一可视化)
+#   - backdoor_report.pdf (综合报告)
+#   - results.json (评估指标)
+#   - training_log.csv (训练历史)
+```
 
 ---
 

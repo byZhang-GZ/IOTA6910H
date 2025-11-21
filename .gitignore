@@ -1,1 +1,3 @@
-echo "data/" >> .gitignoredata/
+echo "data/" >> .gitignore
+echo "artifacts/" >> .gitignore
+echo "backdoor_results/" >> .gitignore

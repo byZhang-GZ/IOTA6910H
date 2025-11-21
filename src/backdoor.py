@@ -19,14 +19,15 @@ from dataclasses import dataclass
 class BackdoorConfig:
     """Configuration for backdoor attack"""
     target_class: int = 0  # Target class for backdoor
-    poison_rate: float = 0.01  # Percentage of training data to poison (0.5%-3%)
-    feature_collision_steps: int = 100  # Optimization steps for feature collision
-    feature_collision_lr: float = 0.1  # Learning rate for feature collision
+    poison_rate: float = 0.02  # Percentage of training data to poison (INCREASED from 1% to 2%)
+    feature_collision_steps: int = 200  # Optimization steps (INCREASED from 100 to 200)
+    feature_collision_lr: float = 0.05  # Learning rate for feature collision (DECREASED for stability)
     trigger_size: int = 5  # Size of trigger patch (5x5 pixels)
     trigger_value: float = 1.0  # Trigger pattern value
     trigger_position: str = "bottom-right"  # Position of trigger
-    epsilon: float = 16/255  # Maximum perturbation for poison generation
+    epsilon: float = 32/255  # Maximum perturbation (INCREASED from 16/255 to 32/255)
     watermark_opacity: float = 0.2  # Opacity for blend trigger
+    feature_lambda: float = 0.05  # Weight for perturbation loss (DECREASED from 0.1 for stronger collision)
 
 
 class TriggerPattern:
@@ -165,10 +166,13 @@ def generate_poison_with_feature_collision(
     # Initialize poisoned samples as source images
     poison_images = source_images.clone().requires_grad_(True)
     
-    # Extract feature extractor (remove final classification layer)
-    feature_extractor = nn.Sequential(*list(model.children())[:-1])
+    # Extract deeper feature extractor (include avgpool for better feature representation)
+    # For ResNet-18: conv layers -> avgpool (removes fc layer)
+    feature_extractor = nn.Sequential(*list(model.children())[:-1])  # Includes avgpool
+    feature_extractor.eval()
     
-    optimizer = torch.optim.Adam([poison_images], lr=config.feature_collision_lr)
+    # Use SGD with momentum for more stable optimization
+    optimizer = torch.optim.SGD([poison_images], lr=config.feature_collision_lr, momentum=0.9)
     
     # Feature collision optimization
     for step in tqdm(range(config.feature_collision_steps), desc="Generating poison", leave=False):
@@ -177,17 +181,25 @@ def generate_poison_with_feature_collision(
         # Extract features
         with torch.no_grad():
             target_features = feature_extractor(target_images)
+            target_features = target_features.flatten(1)  # Flatten spatial dimensions
         
         poison_features = feature_extractor(poison_images)
+        poison_features = poison_features.flatten(1)
         
         # Feature collision loss: make features similar to target class
-        feature_loss = F.mse_loss(poison_features, target_features)
+        # Using both MSE and cosine similarity for stronger alignment
+        feature_mse_loss = F.mse_loss(poison_features, target_features)
+        
+        # Cosine similarity loss (maximize similarity = minimize negative similarity)
+        cosine_sim = F.cosine_similarity(poison_features, target_features, dim=1).mean()
+        feature_cosine_loss = 1 - cosine_sim  # Convert similarity to loss
         
         # Perturbation constraint: keep poison close to source
         perturbation_loss = F.mse_loss(poison_images, source_images)
         
-        # Combined loss (λ controls trade-off)
-        loss = feature_loss + 0.1 * perturbation_loss
+        # Combined loss with configurable lambda
+        # Stronger feature collision (lower lambda on perturbation)
+        loss = feature_mse_loss + 0.5 * feature_cosine_loss + config.feature_lambda * perturbation_loss
         
         loss.backward()
         optimizer.step()
